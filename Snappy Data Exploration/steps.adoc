@@ -1,0 +1,269 @@
+# Observe Couchbase for Analytics (Docker) #
+
+NOTE: This is the script for my "Snappy Data Exploration" presenation/demo.  
+
+(It's useful to run htop as we progress through this exercise - so we can see the CPUs all being used by the query engine.)
+
+## Intialize Couchbase Docker Container ##
+
+[source,bash]
+----
+docker run -d --name cb66ee \
+-p 8091-8096:8091-8096 \
+-p 18091-18096:18091-18096 \
+-p 11210-11211:11210-11211 \
+-v /mnt/md0/samples:/mnt/samples \
+-v /mnt/md0/cb-data:/mnt/cb-data \
+-v /mnt/md0/cb-analytics:/mnt/cb-analytics \
+couchbase:enterprise-6.6.0
+----
+
+
+## Check the number of virtual CPUs ##
+
+[source, bash]
+----
+# Open a shell into the Couchbase container:
+docker exec -it cb66ee /bin/bash
+
+# Check the number of virtual CPUs:
+cat /proc/cpuinfo | grep processor | awk '{print $3}'
+----
+
+## (Optional) Initialize the Couchbase Node Using `couchbase-cli` ##
+
+This step will save time setting up for lots of multi-threaded execution.  Make sure you have one `--node-init-analytics-path` for each CPU core. The second-level directory needs to be created already.  The lowest level directories will be created by couchbase-cli if needed. 
+
+The below example showes 32 unique paths for my 32 virtual CPUs.
+
+[source,bash]
+----
+# Initialize the node using the correct number of individual analytics storage paths:
+couchbase-cli node-init -c 127.0.0.1 \
+-u Administrator -p password \
+--node-init-data-path /mnt/cb-data \
+--node-init-index-path /mnt/cb-data \
+--node-init-eventing-path /mnt/cb-data \
+--node-init-analytics-path /mnt/cb-analytics/00 \
+--node-init-analytics-path /mnt/cb-analytics/01 \
+--node-init-analytics-path /mnt/cb-analytics/02 \
+--node-init-analytics-path /mnt/cb-analytics/03 \
+--node-init-analytics-path /mnt/cb-analytics/04 \
+--node-init-analytics-path /mnt/cb-analytics/05 \
+--node-init-analytics-path /mnt/cb-analytics/06 \
+--node-init-analytics-path /mnt/cb-analytics/07 \
+--node-init-analytics-path /mnt/cb-analytics/08 \
+--node-init-analytics-path /mnt/cb-analytics/09 \
+--node-init-analytics-path /mnt/cb-analytics/10 \
+--node-init-analytics-path /mnt/cb-analytics/11 \
+--node-init-analytics-path /mnt/cb-analytics/12 \
+--node-init-analytics-path /mnt/cb-analytics/13 \
+--node-init-analytics-path /mnt/cb-analytics/14 \
+--node-init-analytics-path /mnt/cb-analytics/15 \
+--node-init-analytics-path /mnt/cb-analytics/16 \
+--node-init-analytics-path /mnt/cb-analytics/17 \
+--node-init-analytics-path /mnt/cb-analytics/18 \
+--node-init-analytics-path /mnt/cb-analytics/19 \
+--node-init-analytics-path /mnt/cb-analytics/20 \
+--node-init-analytics-path /mnt/cb-analytics/21 \
+--node-init-analytics-path /mnt/cb-analytics/22 \
+--node-init-analytics-path /mnt/cb-analytics/23 \
+--node-init-analytics-path /mnt/cb-analytics/24 \
+--node-init-analytics-path /mnt/cb-analytics/25 \
+--node-init-analytics-path /mnt/cb-analytics/26 \
+--node-init-analytics-path /mnt/cb-analytics/27 \
+--node-init-analytics-path /mnt/cb-analytics/28 \
+--node-init-analytics-path /mnt/cb-analytics/29 \
+--node-init-analytics-path /mnt/cb-analytics/30 \
+--node-init-analytics-path /mnt/cb-analytics/31 \
+--node-init-hostname 127.0.0.1 \
+--ipv4
+
+# Check that the analytics paths were created:
+ls /mnt/cb-analytics
+----
+
+
+## Use WEBUI  to set up single-node cluster with data and analytics services ##
+
+Open web browser to: `http://localhost:8091`
+
+ - set cluster name, username, and password
+ - verify data storage locations
+ - data service quota 20000MB
+ - analytics service quota 20000MB
+
+## Import and Query the Chicago Crimes Sample ##
+
+### Check the uncompressed size of our sample: ###
+
+[source,bash]
+----
+cd /mnt/samples
+wc -l Crimes_-_2001_to_Present.csv
+du -h Crimes_-_2001_to_Present.csv
+----
+
+### Using the WebUI, create a bucket ###
+
+ - name it `chicagoCrimes`
+ - 2000MB cache (roughly size of .csv)
+ - no replicas (to stop UI from nagging)
+
+Navigate to bucket statistics
+
+
+### Use `cbimport` to load the csv data into Couchbase ###
+
+[source,sh]
+----
+time /opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
+-u Administrator -p password -b chicagoCrimes \
+-d file:///mnt/samples/Crimes_-_2001_to_Present.csv \
+-g chicagoCrimes::%ID% -t 16
+----
+
+### Get Data into Analytics: ###
+
+[source,sql]
+----
+CREATE DATASET chicagoCrimes ON chicagoCrimes;
+CONNECT LINK Local;
+----
+
+### Sample the data: ###
+
+[source,sql]
+----
+SELECT * FROM chicagoCrimes LIMIT 3;
+----
+
+### How many crimes of each `Primary Type` in 2019? ###
+
+[source,sql]
+----
+SELECT Year, `Primary Type`, count(`Primary Type`) AS `count`
+FROM chicagoCrimes
+WHERE Year = "2019" 
+GROUP BY Year, `Primary Type`
+ORDER BY Year DESC, COUNT(`Primary Type`) DESC;
+----
+
+### Annual Averages of Each `Primary Type`: ###
+
+[source,sql]
+----
+WITH totalsByYearType AS (
+  SELECT Year, `Primary Type`, count(`Primary Type`) AS `count`
+  FROM chicagoCrimes
+  WHERE Year = "2019" 
+  GROUP BY Year, `Primary Type`
+)
+
+SELECT AVG(t.`count`) AS `annual_avg`, t.`Primary Type`
+FROM totalsByYearType t
+ORDER BY AVG(t.`count`) DESC
+----
+
+## Import and Query the State Drug Utilization Sample ##
+
+### Check the uncompressed size of our sample: ###
+
+[source,bash]
+----
+cd /mnt/samples/state-drug-util
+cat * | wc -l
+du -h
+----
+
+### Using the WebUI, create a bucket ###
+
+ - name it `stateDrugUtil`
+ - 1000MB cache
+ - no replicas (to stop UI from nagging)
+
+Navigate to bucket statistics
+
+
+### Connect Analytics to the bucket: ###
+
+[source,sql]
+----
+CREATE DATASET stateDrugUtil ON stateDrugUtil;
+CONNECT LINK Local;
+----
+
+### Use `cbimport` to load the csv data into Couchbase ###
+
+This step takes about 10 mins. But we can start querying while the import is going.
+
+[source,sh]
+----
+for i in $(ls /mnt/samples/state-drug-util)
+do
+  nice /opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
+  -u Administrator -p password -b stateDrugUtil \
+  -d file:///mnt/samples/state-drug-util/$i \
+  -g stateDrugUtil::#UUID# -t 4 &
+done
+----
+
+### Sample the data: ###
+
+[source,sql]
+----
+SELECT * FROM stateDrugUtil LIMIT 3;
+----
+
+### What were the top 5 product prescriptions? ###
+
+[source,sql]
+----
+SELECT `Product Name`, count(`Product Name`) AS `count`
+FROM stateDrugUtil 
+GROUP BY `Product Name`
+ORDER BY COUNT(`Product Name`) DESC
+LIMIT 5;
+----
+
+### How many annual prescriptions of gabapentin? ###
+
+[source,sql]
+----
+SELECT s.Year, count(s) AS `count`
+FROM stateDrugUtil s
+WHERE  s.`Product Name` = "GABAPENTIN"
+GROUP BY s.Year
+ORDER BY s.Year;
+----
+
+
+
+## Optional Weather Data ##
+
+[source,sh]
+----
+/opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
+-u Administrator -p password -b default \
+-d file:///mnt/samples/State_Drug_Utilization_Data_2019.csv \
+-g stateDrugUtil::#UUID# -t 16
+----
+
+
+[source,sh]
+----
+for i in $(ls /mnt/samples/2019-weather)
+do
+  nice /opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
+  -u Administrator -p password -b default \
+  -d file:///mnt/samples/2019-weather/$i \
+  -g weather::#UUID# -t 4 &
+  MYTHREADS=`ps -ef | grep cbimport | wc -l`
+  while [ $MYTHREADS -gt 20 ]
+  do
+    echo sleeping
+    sleep .1
+    MYTHREADS=`ps -ef | grep cbimport | wc -l`
+  done
+done
+----

@@ -4,6 +4,7 @@ NOTE: This is the script for my "Snappy Data Exploration" presenation/demo.
 
 (It's useful to run htop as we progress through this exercise - so we can see the CPUs all being used by the query engine.)
 
+
 ## Intialize Couchbase Docker Container ##
 
 [source,bash]
@@ -19,7 +20,7 @@ couchbase:enterprise-6.6.0
 ----
 
 
-## Check the number of virtual CPUs ##
+### Check the number of virtual CPUs ###
 
 [source, bash]
 ----
@@ -30,7 +31,7 @@ docker exec -it cb66ee /bin/bash
 cat /proc/cpuinfo | grep processor | awk '{print $3}'
 ----
 
-## (Optional) Initialize the Couchbase Node Using `couchbase-cli` ##
+### (Optional) Initialize the Couchbase Node Using `couchbase-cli` ###
 
 This step will save time setting up for lots of multi-threaded execution.  Make sure you have one `--node-init-analytics-path` for each CPU core. The second-level directory needs to be created already.  The lowest level directories will be created by couchbase-cli if needed. 
 
@@ -84,7 +85,7 @@ ls /mnt/cb-analytics
 ----
 
 
-## Use WEBUI  to set up single-node cluster with data and analytics services ##
+### Use WEBUI  to set up single-node cluster with data and analytics services ###
 
 Open web browser to: `http://localhost:8091`
 
@@ -93,7 +94,8 @@ Open web browser to: `http://localhost:8091`
  - data service quota 20000MB
  - analytics service quota 20000MB
 
-## Import and Query the Chicago Crimes Sample ##
+
+## Import the Chicago Crimes Sample ##
 
 ### Check the uncompressed size of our sample: ###
 
@@ -131,6 +133,9 @@ CREATE DATASET chicagoCrimes ON chicagoCrimes;
 CONNECT LINK Local;
 ----
 
+
+## Query the Chicago Crimes Sample ##
+
 ### Sample the data: ###
 
 [source,sql]
@@ -165,7 +170,8 @@ FROM totalsByYearType t
 ORDER BY AVG(t.`count`) DESC
 ----
 
-## Import and Query the State Drug Utilization Sample ##
+
+## Import the State Drug Utilization Sample ##
 
 ### Check the uncompressed size of our sample: ###
 
@@ -207,6 +213,9 @@ do
   -g stateDrugUtil::#UUID# -t 4 &
 done
 ----
+
+
+## Query the State Drug Utilization Sample ##
 
 ### Sample the data: ###
 

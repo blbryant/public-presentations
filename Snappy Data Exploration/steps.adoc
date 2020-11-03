@@ -147,11 +147,11 @@ SELECT * FROM chicagoCrimes LIMIT 3;
 
 [source,sql]
 ----
-SELECT Year, `Primary Type`, count(`Primary Type`) AS `count`
-FROM chicagoCrimes
-WHERE Year = "2019" 
-GROUP BY Year, `Primary Type`
-ORDER BY Year DESC, COUNT(`Primary Type`) DESC;
+SELECT `Primary Type`, count(`Primary Type`) AS `count`
+FROM chicagoCrimes 
+WHERE Year = "2019"
+GROUP BY `Primary Type`
+ORDER BY COUNT(`Primary Type`) DESC;
 ----
 
 ### Annual Averages of Each `Primary Type`: ###
@@ -160,13 +160,13 @@ ORDER BY Year DESC, COUNT(`Primary Type`) DESC;
 ----
 WITH totalsByYearType AS (
   SELECT Year, `Primary Type`, count(`Primary Type`) AS `count`
-  FROM chicagoCrimes
-  WHERE Year = "2019" 
+  FROM chicagoCrimes 
   GROUP BY Year, `Primary Type`
 )
 
 SELECT AVG(t.`count`) AS `annual_avg`, t.`Primary Type`
 FROM totalsByYearType t
+GROUP BY t.`Primary Type`
 ORDER BY AVG(t.`count`) DESC
 ----
 

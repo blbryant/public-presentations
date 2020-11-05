@@ -119,7 +119,7 @@ Navigate to bucket statistics
 
 [source,sh]
 ----
-time /opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
+time nice /opt/couchbase/bin/cbimport csv -c couchbase://127.0.0.1 \
 -u Administrator -p password -b chicagoCrimes \
 -d file:///mnt/samples/Crimes_-_2001_to_Present.csv \
 -g chicagoCrimes::%ID% -t 16
@@ -147,7 +147,7 @@ SELECT * FROM chicagoCrimes LIMIT 3;
 
 [source,sql]
 ----
-SELECT `Primary Type`, count(`Primary Type`) AS `count`
+SELECT `Primary Type`, COUNT(`Primary Type`) AS `count`
 FROM chicagoCrimes 
 WHERE Year = "2019"
 GROUP BY `Primary Type`
@@ -185,7 +185,7 @@ du -h
 ### Using the WebUI, create a bucket ###
 
  - name it `stateDrugUtil`
- - 1000MB cache
+ - 10000MB cache
  - no replicas (to stop UI from nagging)
 
 Navigate to bucket statistics
@@ -228,10 +228,10 @@ SELECT * FROM stateDrugUtil LIMIT 3;
 
 [source,sql]
 ----
-SELECT `Product Name`, count(`Product Name`) AS `count`
+SELECT `Product Name`, SUM(TONUMBER(`Number of Prescriptions`)) AS `count`
 FROM stateDrugUtil 
 GROUP BY `Product Name`
-ORDER BY COUNT(`Product Name`) DESC
+ORDER BY SUM(TONUMBER(`Number of Prescriptions`)) DESC
 LIMIT 5;
 ----
 
@@ -239,7 +239,7 @@ LIMIT 5;
 
 [source,sql]
 ----
-SELECT s.Year, count(s) AS `count`
+SELECT s.Year, SUM(TONUMBER(`Number of Prescriptions`)) AS `count`
 FROM stateDrugUtil s
 WHERE  s.`Product Name` = "GABAPENTIN"
 GROUP BY s.Year

@@ -4,8 +4,18 @@ NOTE: This is the script for my "Snappy Data Exploration" presenation/demo.
 
 (It's useful to run htop as we progress through this exercise - so we can see the CPUs all being used by the query engine.)
 
+## Data used in this exercise: ##
+You can download the sample data sets here:
+
+link:https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-Present/ijzp-q8t2[Chicago Crimes]
+
+link:https://data.medicaid.gov/browse?category=State+Drug+Utilization&limitTo=datasets[Medicaid State Drug Utilization] - 2011-present
+
+
+
 
 ## Intialize Couchbase Docker Container ##
+(your local paths may vary)
 
 [source,bash]
 ----

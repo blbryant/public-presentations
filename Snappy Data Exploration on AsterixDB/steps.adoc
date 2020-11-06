@@ -2,6 +2,14 @@
 
 Alternative "Snappy ..." instructions for setting up and using Apache AsterixDB
 
+## Data used in this exercise: ##
+You can download the sample data sets here:
+
+link:https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-Present/ijzp-q8t2[Chicago Crimes]
+
+link:https://data.medicaid.gov/browse?category=State+Drug+Utilization&limitTo=datasets[Medicaid State Drug Utilization] - 2011-present
+
+
 ## Configure AsterixDB in a new Ubuntu Docker container ##
 
 ### Customize a new Ubuntu container ###
@@ -217,7 +225,9 @@ You should get a similar result (time will vary):
 Duration of all jobs: 32.644 sec
 ----
 
-### Run the Sample Queries ###
+### Run the Chicago Crimes Sample Queries ###
+
+__**Chicago Crimes Query 1 **__
 
 [source,sql]
 ----
@@ -230,6 +240,24 @@ USE ChicagoCrimes;
     ORDER BY COUNT(`Primary Type`) DESC;
     };
 ----
+
+Results:
+[source,json]
+----
+{ "Primary Type": "THEFT", "count": 62430 }
+{ "Primary Type": "BATTERY", "count": 49494 }
+{ "Primary Type": "CRIMINAL DAMAGE", "count": 26680 }
+{ "Primary Type": "ASSAULT", "count": 20613 }
+{ "Primary Type": "DECEPTIVE PRACTICE", "count": 18521 }
+...
+----
+
+[source,sh]
+----
+Duration of all jobs: 1.236 sec
+----
+
+__**Chicago Crimes Query 2 **__
 
 [source,sql]
 ----
@@ -246,6 +274,23 @@ USE ChicagoCrimes;
     GROUP BY t.`Primary Type`
     ORDER BY AVG(t.`count`) DESC
     ;
+----
+
+Results:
+[source,json]
+----
+{ "annual_avg": 76167.0, "Primary Type": "THEFT" }
+{ "annual_avg": 66100.8, "Primary Type": "BATTERY" }
+{ "annual_avg": 41098.05, "Primary Type": "CRIMINAL DAMAGE" }
+{ "annual_avg": 36707.35, "Primary Type": "NARCOTICS" }
+{ "annual_avg": 22829.85, "Primary Type": "ASSAULT" }
+{ "annual_avg": 22391.25, "Primary Type": "OTHER OFFENSE" }
+...
+----
+
+[source,sh]
+----
+Duration of all jobs: 2.359 sec
 ----
 
 ## Explore the Medicaid State Drug Utilization data ##
@@ -317,7 +362,9 @@ You should get a similar result (time will vary):
 Duration of all jobs: 907.022 sec
 ----
 
-### Run the Sample Queries ###
+### Run the State Drug Util Sample Queries ###
+
+__**State Drug Util Query 1 **__
 
 [source,sql]
 ----
@@ -330,6 +377,23 @@ USE StateDrugUtil;
     LIMIT 5;
 ----
 
+Results:
+[source,json]
+----
+{ "Product Name": "AMOXICILLI", "count": 304418370 }
+{ "Product Name": "HYDROCODON", "count": 237932591 }
+{ "Product Name": "IBUPROFEN", "count": 230195074 }
+{ "Product Name": "LISINOPRIL", "count": 214900487 }
+{ "Product Name": "OMEPRAZOLE", "count": 166384605 }
+----
+
+[source,sh]
+----
+Duration of all jobs: 10.607 sec
+----
+
+__**State Drug Util Query 2 **__
+
 [source,sql]
 ----
 USE StateDrugUtil;
@@ -339,4 +403,24 @@ USE StateDrugUtil;
     WHERE  s.`Product Name` = "GABAPENTIN"
     GROUP BY s.Year
     ORDER BY s.Year;
+----
+
+Results:
+[source,json]
+----
+{ "Year": "2011", "count": 8633150 }
+{ "Year": "2012", "count": 10313884 }
+{ "Year": "2013", "count": 11567224 }
+{ "Year": "2014", "count": 14672167 }
+{ "Year": "2015", "count": 19139075 }
+{ "Year": "2016", "count": 22506291 }
+{ "Year": "2017", "count": 25255362 }
+{ "Year": "2018", "count": 24824894 }
+{ "Year": "2019", "count": 22989200 }
+{ "Year": "2020", "count": 4146946 }
+----
+
+[source,sh]
+----
+Duration of all jobs: 4.744 sec
 ----

@@ -1,0 +1,426 @@
+# Snappy Data Exploration on AMD Ryzen Threadripper and AsterixDB
+
+Alternative "Snappy ..." instructions for setting up and using Apache AsterixDB
+
+## Data used in this exercise: ##
+You can download the sample data sets here:
+
+link:https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-Present/ijzp-q8t2[Chicago Crimes]
+
+link:https://data.medicaid.gov/browse?category=State+Drug+Utilization&limitTo=datasets[Medicaid State Drug Utilization] - 2011-present
+
+
+## Configure AsterixDB in a new Ubuntu Docker container ##
+
+### Customize a new Ubuntu container ###
+Run new ubuntu container; install jdk; create user; run sshd and htop
+
+[source,sh]
+----
+docker run -dit \
+--name adb01 \
+-p 7723:22 \
+-p 19001:19001 \
+-v /mnt/md0/samples:/mnt/samples \
+-v /mnt/md0/adb-data:/mnt/adb-data \
+ubuntu 
+
+docker exec -it adb01 /bin/bash
+apt update
+apt install htop default-jdk ssh unzip nano sudo -y
+
+useradd -m adbuser
+passwd adbuser
+usermod -aG sudo adbuser
+
+chmod 777 /mnt/adb-data
+
+service ssh start
+
+htop
+----
+
+### Install AsterixDB on container and configure local Node Controller ###
+
+In a new terminal window SSH into the container, install AsterixDB, configure and run the node controller: 
+
+[source,sh]
+----
+ssh -p 7723 intenuser@host
+bash
+
+cd ~
+mkdir asterix
+cd asterix
+
+wget http://apache.mirrors.hoobly.com/asterixdb/asterixdb-0.9.5/asterix-server-0.9.5-binary-assembly.zip
+
+unzip asterix-server-0.9.5-binary-assembly.zip
+cd apache-asterixdb-0.9.5
+
+echo "[ncservice]
+port=9091" >> nc.conf
+
+bin/asterixncservice -config-file nc.conf > nc-service.log 2>&1 &
+mkdir logs && touch logs/nc-asterix_nc1.log
+tail -f logs/nc-asterix_nc1.log
+----
+
+### Configure and run AsterixDB Cluster Controller ###
+
+In a new terminal SSH into container; configure and run asterixdb cc
+[source,sh]
+----
+ssh -p 7723 adbuser@localhost
+bash
+
+cd ~/asterix/apache-asterixdb-0.9.5
+
+nano cc.conf
+
+## create the following cc.conf file.
+## uncomment the correct line for the desired number of worker threads  
+## <begin cc.conf>:
+
+[nc/asterix_nc1]
+ncservice.port=9091
+txn.log.dir=target/tmp/asterix_nc1/txnlog
+core.dump.dir=target/tmp/asterix_nc1/coredump
+
+# 32 worker threads
+#iodevices=/mnt/adb-data/asterix_nc1/t32/iodevice01,/mnt/adb-data/asterix_nc1/t32/iodevice02,/mnt/adb-data/asterix_nc1/t32/iodevice03,/mnt/adb-data/asterix_nc1/t32/iodevice04,/mnt/adb-data/asterix_nc1/t32/iodevice05,/mnt/adb-data/asterix_nc1/t32/iodevice06,/mnt/adb-data/asterix_nc1/t32/iodevice07,/mnt/adb-data/asterix_nc1/t32/iodevice08,/mnt/adb-data/asterix_nc1/t32/iodevice09,/mnt/adb-data/asterix_nc1/t32/iodevice10,/mnt/adb-data/asterix_nc1/t32/iodevice11,/mnt/adb-data/asterix_nc1/t32/iodevice12,/mnt/adb-data/asterix_nc1/t32/iodevice13,/mnt/adb-data/asterix_nc1/t32/iodevice14,/mnt/adb-data/asterix_nc1/t32/iodevice15,/mnt/adb-data/asterix_nc1/t32/iodevice16,/mnt/adb-data/asterix_nc1/t32/iodevice17,/mnt/adb-data/asterix_nc1/t32/iodevice18,/mnt/adb-data/asterix_nc1/t32/iodevice19,/mnt/adb-data/asterix_nc1/t32/iodevice20,/mnt/adb-data/asterix_nc1/t32/iodevice21,/mnt/adb-data/asterix_nc1/t32/iodevice22,/mnt/adb-data/asterix_nc1/t32/iodevice23,/mnt/adb-data/asterix_nc1/t32/iodevice24,/mnt/adb-data/asterix_nc1/t32/iodevice25,/mnt/adb-data/asterix_nc1/t32/iodevice26,/mnt/adb-data/asterix_nc1/t32/iodevice27,/mnt/adb-data/asterix_nc1/t32/iodevice28,/mnt/adb-data/asterix_nc1/t32/iodevice29,/mnt/adb-data/asterix_nc1/t32/iodevice30,/mnt/adb-data/asterix_nc1/t32/iodevice31,/mnt/adb-data/asterix_nc1/t32/iodevice32
+
+# 8 worker threads
+#iodevices=/mnt/adb-data/asterix_nc1/t08/iodevice01,/mnt/adb-data/asterix_nc1/t08/iodevice02,/mnt/adb-data/asterix_nc1/t08/iodevice03,/mnt/adb-data/asterix_nc1/t08/iodevice04,/mnt/adb-data/asterix_nc1/t08/iodevice05,/mnt/adb-data/asterix_nc1/t08/iodevice06,/mnt/adb-data/asterix_nc1/t08/iodevice07,/mnt/adb-data/asterix_nc1/t08/iodevice08
+
+# 2 worker threads
+iodevices=/mnt/adb-data/asterix_nc1/t02/iodevice01,/mnt/adb-data/asterix_nc1/t02/iodevice02
+
+nc.api.port=19004
+
+jvm.args=-Xmx4096m -Dnode.Resolver="org.apache.asterix.external.util.IdentitiyResolverFactory" 
+
+
+address=0.0.0.0
+public.address=localhost
+cluster.address=localhost
+cluster.listen.port=35003
+data.listen.port=35004
+messaging.listen.port=35005
+result.listen.port=35006
+
+
+[nc]
+command=asterixnc
+app.class=org.apache.asterix.hyracks.bootstrap.NCApplication
+storage.buffercache.pagesize=32KB
+storage.buffercache.size=128MB
+storage.memorycomponent.globalbudget=512MB
+#storage.io.scheduler=greedy
+#storage.filtered.memorycomponent.max.size=16MB
+
+[cc]
+app.class=org.apache.asterix.hyracks.bootstrap.CCApplication
+heartbeat.period=2000
+heartbeat.max.misses=25
+address=localhost
+
+[common]
+log.dir = logs/
+log.level = INFO
+compiler.framesize=32KB
+compiler.sortmemory=320KB
+compiler.groupmemory=160KB
+compiler.joinmemory=256KB
+compiler.textsearchmemory=160KB
+#compiler.windowmemory=192KB
+#compiler.sort.parallel=false
+messaging.frame.size=4096
+messaging.frame.count=512
+metadata.callback.port=35001
+metadata.listen.port=35002
+
+### <end cc.conf>
+
+
+bin/asterixcc -config-file cc.conf > cc.log 2>&1 &
+tail -f logs/cc.log
+
+jps
+# kill pid to stop
+----
+
+### Launch the WebUI and test with a query ###
+
+In you web browser, navigate to http://localhost:19001
+
+Paste in a simple query: 
+[source,sql]
+----
+SELECT 1 AS aNumber;
+----
+
+You should get the following result:
+[source,json]
+----
+{ "aNumber": 1 }
+----
+
+## Explore the Chicago Crimes data ##
+
+### Load the Chicago Crimes dataset from .csv ###
+You may wish to customize your data types.  In a pinch, we can always just load everything up as `string`.
+[source,sql]
+----
+DROP DATAVERSE ChicagoCrimes IF EXISTS;
+    CREATE DATAVERSE ChicagoCrimes;
+    USE ChicagoCrimes;
+
+    CREATE TYPE ChicagoCrimeType AS {
+        `ID`: string,
+        `Case Number`: string,
+        `Date`: string,
+        `Block`: string,
+        `IUCR`: string,
+        `Primary Type`: string,
+        `Description`: string,
+        `Location Description`: string,
+        `Arrest`: string,
+        `Domestic`: string,
+        `Beat`: string,
+        `District`: string,
+        `Ward`: string,
+        `Community Area`: string,
+        `FBI Code`: string,
+        `X Coordinate`: string,
+        `Y Coordinate`: string,
+        `Year`: string,
+        `Updated On`: string,
+        `Latitude`: string,
+        `Longitude`: string,
+        `Location`: string
+    };
+----
+
+[source,sql]
+----
+USE ChicagoCrimes;
+
+    CREATE DATASET ChicagoCrimes(ChicagoCrimeType) 
+        PRIMARY KEY `ID`;
+----
+
+[source,sql]
+----
+USE ChicagoCrimes;
+
+    load dataset ChicagoCrimes using localfs
+        (("path"="localhost:///mnt/samples/Crimes_-_2001_to_Present.csv"),
+        ("format"="delimited-text"));
+----
+
+You should get a similar result (time will vary):
+[source,json]
+----
+Duration of all jobs: 32.644 sec
+----
+
+### Run the Chicago Crimes Sample Queries ###
+
+__**Chicago Crimes Query 1 **__
+
+[source,sql]
+----
+USE ChicagoCrimes;
+
+    SELECT `Primary Type`, COUNT(`Primary Type`) AS `count`
+    FROM ChicagoCrimes
+    WHERE Year = "2019"
+    GROUP BY `Primary Type`
+    ORDER BY COUNT(`Primary Type`) DESC;
+    };
+----
+
+Results:
+[source,json]
+----
+{ "Primary Type": "THEFT", "count": 62430 }
+{ "Primary Type": "BATTERY", "count": 49494 }
+{ "Primary Type": "CRIMINAL DAMAGE", "count": 26680 }
+{ "Primary Type": "ASSAULT", "count": 20613 }
+{ "Primary Type": "DECEPTIVE PRACTICE", "count": 18521 }
+...
+----
+
+[source,sh]
+----
+Duration of all jobs: 1.236 sec
+----
+
+__**Chicago Crimes Query 2 **__
+
+[source,sql]
+----
+USE ChicagoCrimes;
+
+    WITH totalsByYearType AS (
+        SELECT Year, `Primary Type`, count(`Primary Type`) AS `count`
+        FROM ChicagoCrimes
+        GROUP BY Year, `Primary Type`
+        )
+
+    SELECT AVG(t.`count`) AS `annual_avg`, t.`Primary Type`
+    FROM totalsByYearType t
+    GROUP BY t.`Primary Type`
+    ORDER BY AVG(t.`count`) DESC
+    ;
+----
+
+Results:
+[source,json]
+----
+{ "annual_avg": 76167.0, "Primary Type": "THEFT" }
+{ "annual_avg": 66100.8, "Primary Type": "BATTERY" }
+{ "annual_avg": 41098.05, "Primary Type": "CRIMINAL DAMAGE" }
+{ "annual_avg": 36707.35, "Primary Type": "NARCOTICS" }
+{ "annual_avg": 22829.85, "Primary Type": "ASSAULT" }
+{ "annual_avg": 22391.25, "Primary Type": "OTHER OFFENSE" }
+...
+----
+
+[source,sh]
+----
+Duration of all jobs: 2.359 sec
+----
+
+## Explore the Medicaid State Drug Utilization data ##
+
+### Load the Medicaid dataset from .csv files ###
+You may wish to customize your data types.  In a pinch, we can always just load everything up as `string`.
+[source,sql]
+----
+DROP DATAVERSE StateDrugUtil IF EXISTS;
+    CREATE DATAVERSE StateDrugUtil;
+    USE StateDrugUtil;
+
+    CREATE TYPE StateDrugUtilType AS {
+        id: uuid,
+        `Utilization Type`: string,
+        `State`: string,
+        `Labeler Code`: string,
+        `Product Code`: string,
+        `Package Size`: string,
+        `Year`: string,
+        `Quarter`: string,
+        `Product Name`: string,
+        `Suppression Used`: string,
+        `Units Reimbursed`: string,
+        `Number of Prescriptions`: string,
+        `Total Amount Reimbursed`: string,
+        `Medicaid Amount Reimbursed`: string,
+        `Non Medicaid Amount Reimbursed`: string,
+        `Quarter Begin`: string,
+        `Quarter Begin Date`: string,
+        `Latitude`: string,
+        `Longitude`: string,
+        `Location`: string,
+        `NDC`: string
+    };
+----
+
+[source,sql]
+----
+USE StateDrugUtil;
+
+    CREATE DATASET StateDrugUtil(StateDrugUtilType)
+        PRIMARY KEY id AUTOGENERATED;
+----
+
+[source,sql]
+----
+USE StateDrugUtil;
+
+    load dataset StateDrugUtil using localfs(   
+        ("path"="
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2011.csv, 
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2012.csv, 
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2013.csv, 
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2014.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2015.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2016.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2017.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2018.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2019.csv,
+            localhost:///mnt/samples/state-drug-util/State_Drug_Utilization_Data_2020.csv"),
+        ("format"="delimited-text")
+        );        
+----
+
+You should get a similar result (time will vary):
+[source,json]
+----
+Duration of all jobs: 907.022 sec
+----
+
+### Run the State Drug Util Sample Queries ###
+
+__**State Drug Util Query 1 **__
+
+[source,sql]
+----
+USE StateDrugUtil;
+
+    SELECT `Product Name`, SUM(TONUMBER(`Number of Prescriptions`)) AS `count`
+    FROM StateDrugUtil
+    GROUP BY `Product Name`
+    ORDER BY SUM(TONUMBER(`Number of Prescriptions`)) DESC
+    LIMIT 5;
+----
+
+Results:
+[source,json]
+----
+{ "Product Name": "AMOXICILLI", "count": 304418370 }
+{ "Product Name": "HYDROCODON", "count": 237932591 }
+{ "Product Name": "IBUPROFEN", "count": 230195074 }
+{ "Product Name": "LISINOPRIL", "count": 214900487 }
+{ "Product Name": "OMEPRAZOLE", "count": 166384605 }
+----
+
+[source,sh]
+----
+Duration of all jobs: 10.607 sec
+----
+
+__**State Drug Util Query 2 **__
+
+[source,sql]
+----
+USE StateDrugUtil;
+
+    SELECT s.Year, SUM(TONUMBER(`Number of Prescriptions`)) AS `count`
+    FROM StateDrugUtil s
+    WHERE  s.`Product Name` = "GABAPENTIN"
+    GROUP BY s.Year
+    ORDER BY s.Year;
+----
+
+Results:
+[source,json]
+----
+{ "Year": "2011", "count": 8633150 }
+{ "Year": "2012", "count": 10313884 }
+{ "Year": "2013", "count": 11567224 }
+{ "Year": "2014", "count": 14672167 }
+{ "Year": "2015", "count": 19139075 }
+{ "Year": "2016", "count": 22506291 }
+{ "Year": "2017", "count": 25255362 }
+{ "Year": "2018", "count": 24824894 }
+{ "Year": "2019", "count": 22989200 }
+{ "Year": "2020", "count": 4146946 }
+----
+
+[source,sh]
+----
+Duration of all jobs: 4.744 sec
+----

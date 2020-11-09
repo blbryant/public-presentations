@@ -104,6 +104,7 @@ Open web browser to: `http://localhost:8091`
  - data service quota 20000MB
  - analytics service quota 20000MB
 
+NOTE: If you don't have as much RAM as I do (64GB), then adjust the RAM quotas down to 5GB and 5GB.  Then do each of the exercises below on at a time.  (You should only load up one of the data sets at any time.  Once you are done with one bucket, delete it.  Then create the new bucket for the second dataset.)
 
 ## Import the Chicago Crimes Sample ##
 
